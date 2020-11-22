@@ -1,52 +1,32 @@
 package main
 
 import (
-	"encoding/json"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"log"
-	"os"
+	ut "uptimerobot-tool/pkg"
 )
 
-
-type Sitelist []struct {
-	WebSiteName string `json:"web-site-name"`
-	Config SitelistConfig `json:"config"`
+// Environment is an application data structure
+type Environment struct {
+	Uptimerobot []ut.Uptimerobot `yaml:"uptimerobot"`
 }
 
-type SitelistConfig      struct {
-	Keyword string `json:"keyword"`
-	Contact string `json:"contact"`
-}
-
-var (
-	LogInfo, LogError            *log.Logger
-	env                          = NewEnv()
-	httpClient, httpClientConfig = NewHTTPClient()
-)
-
-var ApplicationEnvironment string
-
-func init() {
-	LogInfo = log.New(os.Stdout, "INFO: ", 0)
-	LogError = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime)
-}
 func main() {
-	var (
-		sitelist Sitelist
-	)
-
-	sitelist = getSitelistFromFile("./sitelist.json")
-	UptimerobotWorkflow(env, sitelist)
-}
-
-//getSitelistFromFile retrieves list with sites to check from local file
-// returns all sites as array of strings
-func getSitelistFromFile(path string) Sitelist {
-	var sitelist Sitelist
-	file, err := ioutil.ReadFile(path)
+	var e Environment
+	yamlFile, err := ioutil.ReadFile("data/config.yml")
 	if err != nil {
-		LogError.Fatalln("Can't open sitelist file.", err)
+		log.Println("Error while reading yaml file: ", err)
 	}
-	_ = json.Unmarshal([]byte(file), &sitelist)
-	return sitelist
+	err = yaml.Unmarshal(yamlFile, &e)
+	if err != nil {
+		log.Println("Error while decoding yaml file: ", err)
+	}
+	sitelist := ut.GetSitelistFromFile("data/sitelist.json")
+	ut.UptimerobotWorkflow(sitelist, e.Uptimerobot)
+	//ut.DeleteAllMonitors(e.Uptimerobot)
+	//ut.GetAlertContacts(e.Uptimerobot, sitelist[0])
 }
+
+
+
