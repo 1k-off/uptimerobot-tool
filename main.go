@@ -23,10 +23,5 @@ func main() {
 		log.Println("Error while decoding yaml file: ", err)
 	}
 	sitelist := ut.GetSitelistFromFile("data/sitelist.json")
-	ut.UptimerobotWorkflow(sitelist, e.Uptimerobot)
-	//ut.DeleteAllMonitors(e.Uptimerobot)
-	//ut.GetAlertContacts(e.Uptimerobot, sitelist[0])
+	ut.ProcessMonitors(e.Uptimerobot, sitelist)
 }
-
-
-

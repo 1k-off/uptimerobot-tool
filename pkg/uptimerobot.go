@@ -1,270 +1,203 @@
 package uptimerobot_tool
 
 import (
-	"encoding/json"
-	"fmt"
 	uptimerobot "github.com/bitfield/uptimerobot/pkg"
 	"log"
-	"io/ioutil"
+	"net/url"
+	"reflect"
+	"sort"
+	"strconv"
+	"strings"
 )
 
-type Sitelist []Website
-
-type Website struct {
-	WebSiteName string        `json:"web-site-name"`
-	Config      WebsiteConfig `json:"config"`
-}
-type WebsiteConfig struct {
-	Keyword     string   `json:"keyword"`
-	Contact []string `json:"contact"`
-}
-
-type Uptimerobot struct {
-	Token string `yaml:"token" json:"token" toml:"token"`
-	Email string `yaml:"email" json:"email" toml:"email"`
-	Client MyUptimerobotClient
-}
-
-// MyUptimerobotClient is a type that extends original uptimerobot.Client type.
-type MyUptimerobotClient struct {
-	uptimerobot.Client
-}
-
-type httpScheme struct {
-	http  string
-	https string
-}
-
-var scheme httpScheme = httpScheme{http: "http://", https: "https://"}
-
-func init() {
-	log.SetFlags(0)
-}
-//GetSitelistFromFile retrieves list with sites to check from local file
-// returns all sites as array of strings
-func GetSitelistFromFile(path string) Sitelist {
-	var sitelist Sitelist
-	file, err := ioutil.ReadFile(path)
-	if err != nil {
-		log.Println("Can't open sitelist file.", err)
-	}
-	_ = json.Unmarshal([]byte(file), &sitelist)
-	return sitelist
-}
-
-// UptimerobotWorkflow is a main function for work with uptimerobot.
-// Receives environment and sitelist.
-// This function checks if every site from sitelist exists in monitoring accounts and removes monitors from monitoring accounts, that are not exists in sitelist.
-func UptimerobotWorkflow(sitelist Sitelist, uptimerobotAccount []Uptimerobot) {
+func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 	var (
-		clients []MyUptimerobotClient
+		enabledMonitors []uptimerobot.Monitor
 	)
+	getUptimerobotAccountsInfo(uptimerobotAccount)
 
-	for i, _ := range uptimerobotAccount {
-		c := uptimerobot.New(uptimerobotAccount[i].Token)
-		clients = append(clients, MyUptimerobotClient{c})
-		uptimerobotAccount[i].Client = MyUptimerobotClient{c}
+	for _, a := range uptimerobotAccount {
+		enabledMonitors = append(enabledMonitors, a.getAllMonitors()...)
 	}
-
-	enabledMonitors := getAllMonitors(clients)
 
 	for _, m := range enabledMonitors {
-		if checkMonitorShouldBeDeleted(sitelist, m) {
-			deleteMonitor(uptimerobotAccount, m)
-			log.Println("Deleted monitor", m.FriendlyName)
+		if monitorShouldBeDeleted(sitelist, m) {
+			account := findMonitorAccount(uptimerobotAccount, m)
+			account.deleteMonitor(m)
 		}
 	}
-	for _, s := range sitelist {
-		if isExists, monitor := isMonitorExists(enabledMonitors, s.WebSiteName); !(isExists) {
-			id, email := createNewMonitor(clients, s)
-			log.Printf("Created monitor %s in account %s with: ID %v",s.WebSiteName, email, id)
+
+	for _, w := range sitelist {
+		if isExist, monitor := w.isMonitorExists(enabledMonitors); !(isExist) {
+			account := findFreeAccount(uptimerobotAccount)
+			account.createNewMonitor(w)
 		} else {
-			if s.Config.Keyword != "" && monitor.Type == 1 { // monitor.Type == 1 is basic http status code monitor. https://github.com/bitfield/uptimerobot/blob/master/pkg/monitor.go
-				// We could delete monitor with old type and create new one with new type
-				// because we can't update monitor type
-				deleteMonitor(uptimerobotAccount, monitor)
-				_, _ = createNewMonitor(clients, s)
-				log.Println("Changed monitor", s.WebSiteName, "type from HTTP to keyword.")
-			} else if s.Config.Keyword != "" && s.Config.Keyword != monitor.KeywordValue {
-				editMonitorKeyword(uptimerobotAccount, monitor, s.Config.Keyword)
-				log.Println("Changed monitor", monitor.URL, "keyword from", monitor.KeywordValue, "to", s.Config)
-			} else if s.Config.Keyword == "" && monitor.Type == 2 {
-				deleteMonitor(uptimerobotAccount, monitor)
-				_, _ = createNewMonitor(clients, s)
-				log.Println("Changed monitor", s.WebSiteName, "type from keyword to HTTP.")
+			account := findMonitorAccount(uptimerobotAccount, monitor)
+			if !(w.isMonitorEqualToWebsite(monitor, account)) {
+				account.deleteMonitor(monitor)
+				account.createNewMonitor(w)
 			}
 		}
 	}
 }
 
-// getAllMonitors - method returns all monitors from current client.
-func (c MyUptimerobotClient) getAllMonitors() []uptimerobot.Monitor {
-	monitors, err := c.AllMonitors()
+func getUptimerobotAccountsInfo(account []Uptimerobot) {
+	for i := range account {
+		account[i].Client = uptimerobot.New(account[i].Token)
+	}
+}
+
+// getAllMonitors - returns all monitors from account.
+func (account Uptimerobot) getAllMonitors() []uptimerobot.Monitor {
+	monitors, err := account.Client.AllMonitors()
 	if err != nil {
-		log.Println("Can't get monitors for provided client.", err)
+		log.Printf("Can't get monitors for account %s. %e", account.Email, err)
 	}
 	return monitors
 }
 
-// getAllMonitors is a function that returns all monitors from all accounts.
-func getAllMonitors(clients []MyUptimerobotClient) []uptimerobot.Monitor {
-	var monitors []uptimerobot.Monitor
-	for _, c := range clients {
-		monitors = append(monitors, c.getAllMonitors()...)
-	}
-	return monitors
-}
-
-// isMonitorExists is a function that checks if website from sitelist exists in provided monitors array.
-func isMonitorExists(monitors []uptimerobot.Monitor, url string) (bool, uptimerobot.Monitor) {
-	var monitor uptimerobot.Monitor
-	for _, m := range monitors {
-		if m.URL == scheme.http+url || m.URL == scheme.https+url || m.URL == url {
-			monitor = m
-			return true, monitor
-		}
-	}
-	return false, monitor
-}
-
-// checkMonitorShouldBeDeleted is a function for detecting monitors that is not exists in provided sitelist, but still present in uptimerobot.
-func checkMonitorShouldBeDeleted(sitelist Sitelist, m uptimerobot.Monitor) bool {
+// monitorShouldBeDeleted is a function for detecting monitors that is not exists in provided sitelist,
+//but still present in uptimerobot.
+func monitorShouldBeDeleted(sitelist Sitelist, m uptimerobot.Monitor) bool {
 	for _, s := range sitelist {
-		if m.URL == scheme.http+s.WebSiteName || m.URL == scheme.https+s.WebSiteName || m.URL == s.WebSiteName {
+		if m.URL == schemeHttpsFull+s.WebSiteName || m.URL == schemeHttpFull+s.WebSiteName || m.URL == s.WebSiteName {
 			return false
 		}
 	}
 	return true
 }
 
-// freeMonitors - checks if we still can create new monitors in provided client (account).
-func (c MyUptimerobotClient) freeMonitors() bool {
-	return len(c.getAllMonitors()) < 50
+func (account Uptimerobot) deleteMonitor(m uptimerobot.Monitor) {
+	err := account.Client.DeleteMonitor(m.ID)
+	if err != nil {
+		log.Printf("Error while deleting monitor %s from account %s. %e", m.FriendlyName, account.Email, err)
+	} else {
+		log.Printf("Deleted monitor %v from account %v.", m.FriendlyName, account.Email)
+	}
 }
 
-// getWebsiteAlertContact - returns alert contact id by client
-func (w Website) getWebsiteAlertContact(c MyUptimerobotClient) (alertContacts []string) {
-	contacts, err := c.AllAlertContacts()
-	if err != nil {
-		log.Println(err)
-	}
-	for _, neededContact := range w.Config.Contact {
-		for _, contact := range contacts {
-			if neededContact == contact.FriendlyName {
-				alertContacts = append(alertContacts, contact.ID)
-			}
+func (website Website) isMonitorExists(monitors []uptimerobot.Monitor) (bool, uptimerobot.Monitor) {
+	for _, m := range monitors {
+		if m.URL == schemeHttpsFull+website.WebSiteName || m.URL == schemeHttpFull+website.WebSiteName || m.URL == website.WebSiteName {
+			return true, m
 		}
 	}
-	return alertContacts
+	return false, uptimerobot.Monitor{}
 }
 
 // createNewMonitor is a function to create new monitor for provided url in one of available accounts.
 // Receives array of clients and url for monitor, returns created monitor id and email of account in which monitor created.
-func createNewMonitor(clients []MyUptimerobotClient, w Website) (id int64, email string) {
+func (account Uptimerobot) createNewMonitor(website Website) (id int64, email string) {
 	var (
-		targetClient MyUptimerobotClient
-		m            uptimerobot.Monitor
+		monitorType        = uptimerobot.TypeHTTP
+		monitorKeywordType int
+		m                  uptimerobot.Monitor
 	)
-	for _, c := range clients {
-		if c.freeMonitors() {
-			targetClient = c
-			break
-		}
+	if website.Config.Scheme != schemeHttp {
+		website.Config.Scheme = schemeHttps
 	}
-	if w.Config.Keyword != "" {
+	if website.Config.Port == 0 && website.Config.Scheme == schemeHttps {
+		website.Config.Port = 443
+	} else {
+		website.Config.Port = 80
+	}
+
+	if !IsEmptyString(website.Config.Keyword) {
+		monitorType = uptimerobot.TypeKeyword
+
+		if !(IsEmptyString(website.Config.KeywordType)) && !(strings.Contains(website.Config.KeywordType, "not")) {
+			monitorKeywordType = uptimerobot.KeywordExists
+		} else {
+			monitorKeywordType = uptimerobot.KeywordNotExists
+		}
 		m = uptimerobot.Monitor{
-			FriendlyName:  w.WebSiteName,
-			URL:           scheme.https + w.WebSiteName,
-			Type:          2,
-			KeywordType:   2,
-			KeywordValue:  w.Config.Keyword,
-			Port:          443,
-			AlertContacts: w.getWebsiteAlertContact(targetClient),
+			FriendlyName:  website.WebSiteName,
+			URL:           website.Config.Scheme + "://" + website.WebSiteName,
+			Port:          website.Config.Port,
+			Type:          monitorType,
+			KeywordType:   monitorKeywordType,
+			KeywordValue:  website.Config.Keyword,
+			AlertContacts: website.getAlertContactsFromSitelist(account),
 		}
 	} else {
 		m = uptimerobot.Monitor{
-			FriendlyName:  w.WebSiteName,
-			URL:           scheme.https + w.WebSiteName,
-			Type:          1,
-			Port:          443,
-			AlertContacts: w.getWebsiteAlertContact(targetClient),
+			FriendlyName:  website.WebSiteName,
+			URL:           website.Config.Scheme + "://" + website.WebSiteName,
+			Port:          website.Config.Port,
+			Type:          monitorType,
+			AlertContacts: website.getAlertContactsFromSitelist(account),
 		}
 	}
-	id, _ = targetClient.CreateMonitor(m)
-	account, _ := targetClient.GetAccountDetails()
-	email = account.Email
-	return id, email
+
+	id, err := account.Client.CreateMonitor(m)
+	if err != nil {
+		log.Printf("Error while creating monitor for website %s in account %s. %e", website.WebSiteName, account.Email, err)
+	} else {
+		log.Printf("Monitor for %s created in account %s", website.WebSiteName, account.Email)
+	}
+	return id, account.Email
 }
 
-// deleteMonitor deletes provided monitor from all accounts.
-func deleteMonitor(UptimeAccount []Uptimerobot, m uptimerobot.Monitor) {
-	for _, a := range UptimeAccount {
-		monitors := a.Client.getAllMonitors()
-		for _, mon := range monitors {
-			if m.ID == mon.ID {
-				err := a.Client.DeleteMonitor(m.ID)
-				if err != nil {
-					log.Println(err)
-				}
-			}
-		}
-	}
-}
-
-// editMonitorKeyword is a function to change monitor keyword.
-func (c MyUptimerobotClient) editMonitorKeyword(m uptimerobot.Monitor, newKeywordValue string) {
-	r := uptimerobot.Response{}
-	data := []byte(fmt.Sprintf("{\"id\": \"%d\",\"keyword_value\": \"%s\"}", m.ID, newKeywordValue))
-	if err := c.MakeAPICall("editMonitor", &r, data); err != nil {
-		log.Println(err)
-	}
-}
-
-// editMonitorKeyword updates keyword on existing monitor.
-func editMonitorKeyword(UptimeAccount []Uptimerobot, m uptimerobot.Monitor, newKeywordValue string) {
-	for _, a := range UptimeAccount {
-		monitors := a.Client.getAllMonitors()
-		for _, mon := range monitors {
-			if m.ID == mon.ID {
-				a.Client.editMonitorKeyword(mon, newKeywordValue)
-			}
-		}
-	}
-}
-
-// DeleteAllMonitors is a function to delete all monitors from all accounts
-func DeleteAllMonitors(uptimerobotAccount []Uptimerobot) {
-	var (
-		clients []MyUptimerobotClient
-	)
-
-	for i, _ := range uptimerobotAccount {
-		c := uptimerobot.New(uptimerobotAccount[i].Token)
-		clients = append(clients, MyUptimerobotClient{c})
-		uptimerobotAccount[i].Client = MyUptimerobotClient{c}
-	}
-
-	enabledMonitors := getAllMonitors(clients)
-
-	for _, m := range enabledMonitors {
-		deleteMonitor(uptimerobotAccount, m)
-		log.Println("Deleted monitor", m.FriendlyName)
-	}
-}
-
-func GetAlertContacts (UptimeAccount []Uptimerobot, website Website) []string {
-	var (
-		clients []MyUptimerobotClient
-		contacts []string
-	)
-	for _, a := range UptimeAccount {
-		clients = append(clients, a.Client)
-	}
-	monitors := getAllMonitors(clients)
-	for _, m := range monitors {
-		if m.FriendlyName == website.WebSiteName {
-			contacts = m.AlertContacts
-		}
+func (account Uptimerobot) getAlertContacts() (contacts []uptimerobot.AlertContact) {
+	contacts, err := account.Client.AllAlertContacts()
+	if err != nil {
+		log.Printf("Failed to get alert contacts for account %s. %e", account.Email, err)
 	}
 	return contacts
+}
+
+func (website Website) getAlertContactsFromSitelist(account Uptimerobot) (contact []string) {
+	allContacts := account.getAlertContacts()
+	for _, wc := range website.Config.Contact {
+		contactFound := false
+		for _, c := range allContacts {
+			if wc == c.FriendlyName {
+				contact = append(contact, c.ID)
+				contactFound = true
+			}
+		}
+		if !contactFound {
+			log.Printf("Failed to find alert contact %s for website %s in account %s.", wc, website.WebSiteName, account.Email)
+		}
+	}
+	return contact
+}
+
+func (website Website) isMonitorEqualToWebsite(m uptimerobot.Monitor, account Uptimerobot) bool {
+	var (
+		monitorAlertContactsInt, websiteAlertContactsInt []int
+		monitorKeywordType int
+	)
+	monitorAlertContacts := getWebsiteAlertContactsFromAccount(account.Token, m.FriendlyName)
+	websiteAlertContacts := website.getAlertContactsFromSitelist(account)
+
+	for _, mac := range monitorAlertContacts {
+		c, _ := strconv.Atoi(mac)
+		monitorAlertContactsInt = append(monitorAlertContactsInt, c)
+	}
+	for _, wac := range websiteAlertContacts {
+		c, _ := strconv.Atoi(wac)
+		websiteAlertContactsInt = append(websiteAlertContactsInt, c)
+	}
+	sort.Ints(monitorAlertContactsInt)
+	sort.Ints(websiteAlertContactsInt)
+
+	if !(IsEmptyString(website.Config.Keyword)) {
+		if !(IsEmptyString(website.Config.KeywordType)) && !(strings.Contains(website.Config.KeywordType, "not")) {
+			monitorKeywordType = uptimerobot.KeywordExists
+		} else {
+			monitorKeywordType = uptimerobot.KeywordNotExists
+		}
+	}
+
+	if website.Config.Scheme != schemeHttp {
+		website.Config.Scheme = schemeHttps
+	}
+
+	u, _ := url.Parse(m.URL)
+	if !(reflect.DeepEqual(monitorAlertContactsInt, websiteAlertContactsInt)) || (monitorKeywordType != m.KeywordType) || (u.Scheme != website.Config.Scheme) || (website.Config.Keyword != m.KeywordValue) {
+		return false
+	} else {
+		return true
+	}
 }
