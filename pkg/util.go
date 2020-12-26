@@ -25,7 +25,7 @@ func GetSitelistFromFile(path string) Sitelist {
 	if err != nil {
 		log.Println("Can't open sitelist file.", err)
 	}
-	_ = json.Unmarshal([]byte(file), &sitelist)
+	_ = json.Unmarshal(file, &sitelist)
 	return sitelist
 }
 
@@ -39,6 +39,10 @@ func (account Uptimerobot) freeMonitors() bool {
 	return len(account.getAllMonitors()) < 50
 }
 
+// getWebsiteAlertContactsFromAccount is a custom function for getting alert contacts from existing monitor.
+// We need this, because monitor.AlertContacts method from github.com/bitfield/uptimerobot package
+// returns empty array. Function receives token for account and website friendly name (or url, because they are equal)
+// and returns array of alert contact IDs.
 func getWebsiteAlertContactsFromAccount(token, website string) (alertContacts []string) {
 	type ReceivedMonitors struct {
 		Monitors []struct {
@@ -59,7 +63,7 @@ func getWebsiteAlertContactsFromAccount(token, website string) (alertContacts []
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	res, _ := http.DefaultClient.Do(req)
 	defer res.Body.Close()
-	json.NewDecoder(res.Body).Decode(&monitors)
+	_ = json.NewDecoder(res.Body).Decode(&monitors)
 	for _, m := range monitors.Monitors {
 		if m.FriendlyName == website {
 			for _, ac := range m.AlertContacts {
@@ -70,6 +74,8 @@ func getWebsiteAlertContactsFromAccount(token, website string) (alertContacts []
 	return alertContacts
 }
 
+// findMonitorAccount is a function to find account in which provided monitor exists.
+// It receives an array of uptimerobot accounts and monitor and returns one account (first in what provided monitor was found)
 func findMonitorAccount(uptimerobotAccount []Uptimerobot, monitor uptimerobot.Monitor) (account Uptimerobot) {
 	for _, a := range uptimerobotAccount {
 		accountMonitors := a.getAllMonitors()
@@ -82,6 +88,8 @@ func findMonitorAccount(uptimerobotAccount []Uptimerobot, monitor uptimerobot.Mo
 	return
 }
 
+// findFreeAccount is a function to find account that have free space to create new monitors.
+// It receives an array of uptimerobot accounts and returns one account.
 func findFreeAccount(uptimerobotAccount []Uptimerobot) (account Uptimerobot) {
 	for _, a := range uptimerobotAccount {
 		if a.freeMonitors() {

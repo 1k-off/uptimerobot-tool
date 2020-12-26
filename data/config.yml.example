@@ -1,5 +1,5 @@
 uptimerobot:
-  - token:
-    email:
-  - token:
-    email:
+  - token: u1234567-7654321abcdef890g6f924e6
+    email: user+1@gmail.com
+  - token: u1234568-1234567fedvba0986e429fg
+    email: user+2@gmail.com

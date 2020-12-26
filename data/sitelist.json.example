@@ -1,0 +1,32 @@
+[
+  {
+    "web-site-name": "bitbucket.org/product/enterprise",
+    "config": {
+      "keyword": "Bitbucket",
+      "keyword_type": "not exist",
+      "contact": ["slack"]
+    }
+  },
+  {
+    "web-site-name": "kb.1node.xyz",
+    "config": {
+      "contact": ["slack", "teams", "telegram"]
+    }
+  },
+  {
+    "web-site-name": "exchange.1node.xyz/healthcheck",
+    "config": {
+      "keyword": "failed",
+      "keyword_type": "exist",
+      "contact": ["slack", "telegram"],
+      "scheme": "http"
+    }
+  },
+  {
+    "web-site-name": "dash.1node.xyz",
+    "config": {
+      "contact": ["slack"],
+      "scheme": "http"
+    }
+  }
+]

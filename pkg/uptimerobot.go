@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// ProcessMonitors is an entrypoint for uptimerobot tool. It receives an array of uptimerobot accounts and sitelist for processing.
 func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 	var (
 		enabledMonitors []uptimerobot.Monitor
@@ -40,14 +41,14 @@ func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 		}
 	}
 }
-
+// getUptimerobotAccountsInfo receives an array of uptimerobot accounts and creates new client for each account.
 func getUptimerobotAccountsInfo(account []Uptimerobot) {
 	for i := range account {
 		account[i].Client = uptimerobot.New(account[i].Token)
 	}
 }
 
-// getAllMonitors - returns all monitors from account.
+// getAllMonitors - returns all monitors from provided account.
 func (account Uptimerobot) getAllMonitors() []uptimerobot.Monitor {
 	monitors, err := account.Client.AllMonitors()
 	if err != nil {
@@ -57,7 +58,7 @@ func (account Uptimerobot) getAllMonitors() []uptimerobot.Monitor {
 }
 
 // monitorShouldBeDeleted is a function for detecting monitors that is not exists in provided sitelist,
-//but still present in uptimerobot.
+// but still present in uptimerobot.
 func monitorShouldBeDeleted(sitelist Sitelist, m uptimerobot.Monitor) bool {
 	for _, s := range sitelist {
 		if m.URL == schemeHttpsFull+s.WebSiteName || m.URL == schemeHttpFull+s.WebSiteName || m.URL == s.WebSiteName {
@@ -67,6 +68,7 @@ func monitorShouldBeDeleted(sitelist Sitelist, m uptimerobot.Monitor) bool {
 	return true
 }
 
+// deleteMonitor is a method for deleting provided monitor from uptimerobot account.
 func (account Uptimerobot) deleteMonitor(m uptimerobot.Monitor) {
 	err := account.Client.DeleteMonitor(m.ID)
 	if err != nil {
@@ -76,6 +78,8 @@ func (account Uptimerobot) deleteMonitor(m uptimerobot.Monitor) {
 	}
 }
 
+// isMonitorExists receives all existing monitors for all accounts and checks if monitor for provided website exists.
+// Returns true and monitor (if exists) or false and empty monitor.
 func (website Website) isMonitorExists(monitors []uptimerobot.Monitor) (bool, uptimerobot.Monitor) {
 	for _, m := range monitors {
 		if m.URL == schemeHttpsFull+website.WebSiteName || m.URL == schemeHttpFull+website.WebSiteName || m.URL == website.WebSiteName {
@@ -85,8 +89,8 @@ func (website Website) isMonitorExists(monitors []uptimerobot.Monitor) (bool, up
 	return false, uptimerobot.Monitor{}
 }
 
-// createNewMonitor is a function to create new monitor for provided url in one of available accounts.
-// Receives array of clients and url for monitor, returns created monitor id and email of account in which monitor created.
+// createNewMonitor is a method to create new monitor for provided website in the provided account.
+// Receives website object, returns created monitor id and email of account in which monitor created.
 func (account Uptimerobot) createNewMonitor(website Website) (id int64, email string) {
 	var (
 		monitorType        = uptimerobot.TypeHTTP
@@ -138,6 +142,7 @@ func (account Uptimerobot) createNewMonitor(website Website) (id int64, email st
 	return id, account.Email
 }
 
+// getAlertContacts is an account method that returns all existing alert contacts in this account.
 func (account Uptimerobot) getAlertContacts() (contacts []uptimerobot.AlertContact) {
 	contacts, err := account.Client.AllAlertContacts()
 	if err != nil {
@@ -146,6 +151,9 @@ func (account Uptimerobot) getAlertContacts() (contacts []uptimerobot.AlertConta
 	return contacts
 }
 
+// getAlertContactsFromSitelist is a website method that receives account in which monitor for this website will be created
+// and returns an array with alert contact IDs. This function returns only alert contacts that exists in provided account.
+// Alert contacts that not exists in provided account will not be returned.
 func (website Website) getAlertContactsFromSitelist(account Uptimerobot) (contact []string) {
 	allContacts := account.getAlertContacts()
 	for _, wc := range website.Config.Contact {
@@ -163,6 +171,9 @@ func (website Website) getAlertContactsFromSitelist(account Uptimerobot) (contac
 	return contact
 }
 
+// isMonitorEqualToWebsite checks if existing monitor data in uptimerobot account equals to data in provided website.
+// Method receives monitor and account and returns bool value. We need this check, because we can't change monitor
+// in some cases and we need to delete it and create new one. For example, when monitor type changes from http to keyword.
 func (website Website) isMonitorEqualToWebsite(m uptimerobot.Monitor, account Uptimerobot) bool {
 	var (
 		monitorAlertContactsInt, websiteAlertContactsInt []int
