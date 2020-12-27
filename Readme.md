@@ -2,7 +2,7 @@
 [![Build Status](https://1node.beta.teamcity.com/app/rest/builds/buildType(id:UptimerobotTool_Build)/statusIcon)](https://1node.beta.teamcity.com/viewType.html?buildTypeId=UptimerobotTool_Build&guest=1)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=1node-Solutions_uptimerobot-tool&metric=alert_status)](https://sonarcloud.io/dashboard?id=1node-Solutions_uptimerobot-tool)
 
-![](https://uptimerobot.com/assets/images/uptimerobot-logo.svg)
+![](https://cdn.opsmatters.com/sites/default/files/logos/uptime-robot-logo2.png)
 
 This tool is for automation website monitoring management. It uses [uptimerobot.com](https://uptimerobot.com) free accounts as primary service.
 You will need json file with websites and their configurations (see example) and several uptimerobot.com accounts 

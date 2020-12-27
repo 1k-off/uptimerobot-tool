@@ -41,6 +41,7 @@ func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 		}
 	}
 }
+
 // getUptimerobotAccountsInfo receives an array of uptimerobot accounts and creates new client for each account.
 func getUptimerobotAccountsInfo(account []Uptimerobot) {
 	for i := range account {
@@ -177,7 +178,7 @@ func (website Website) getAlertContactsFromSitelist(account Uptimerobot) (contac
 func (website Website) isMonitorEqualToWebsite(m uptimerobot.Monitor, account Uptimerobot) bool {
 	var (
 		monitorAlertContactsInt, websiteAlertContactsInt []int
-		monitorKeywordType int
+		monitorKeywordType                               int
 	)
 	monitorAlertContacts := getWebsiteAlertContactsFromAccount(account.Token, m.FriendlyName)
 	websiteAlertContacts := website.getAlertContactsFromSitelist(account)
