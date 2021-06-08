@@ -4,7 +4,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"log"
-	ut "uptimerobot-tool/pkg"
+	ut "github.com/souladm/uptimerobot-tool/pkg"
 )
 
 // Environment is an application data structure
