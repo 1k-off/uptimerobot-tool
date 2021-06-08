@@ -7,9 +7,7 @@ RUN go build
 
 FROM alpine:latest
 LABEL maintainer="Bogdan Kosarevskyi <bogdan.kosarevskyi@gmail.com>"
-LABEL vendor="1node"
 LABEL lastUpdate="26-12-2020"
-LABEL description="Sonarqube stats bitbucket application."
 COPY --from=build /app/uptimerobot-tool /app/uptimerobot-tool
 COPY --from=build /app/data /app/data
 WORKDIR /app

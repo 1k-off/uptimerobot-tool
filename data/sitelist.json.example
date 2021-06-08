@@ -8,25 +8,18 @@
     }
   },
   {
-    "web-site-name": "kb.1node.xyz",
+    "web-site-name": "test.com",
     "config": {
       "contact": ["slack", "teams", "telegram"]
     }
   },
   {
-    "web-site-name": "exchange.1node.xyz/healthcheck",
+    "web-site-name": "uptimerobot.com/terms",
     "config": {
-      "keyword": "failed",
-      "keyword_type": "exist",
+      "keyword": "products",
+      "keyword_type": "not exist",
       "contact": ["slack", "telegram"],
-      "scheme": "http"
-    }
-  },
-  {
-    "web-site-name": "dash.1node.xyz",
-    "config": {
-      "contact": ["slack"],
-      "scheme": "http"
+      "scheme": "https"
     }
   }
 ]
