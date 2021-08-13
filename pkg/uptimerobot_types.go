@@ -1,6 +1,6 @@
 package uptimerobot_tool
 
-import uptimerobot "github.com/bitfield/uptimerobot/pkg"
+import uptimerobot "github.com/1k-off/uptimerobot/pkg"
 
 // Sitelist type is a representation of a sitelist.json file (array of websites)
 type Sitelist []Website

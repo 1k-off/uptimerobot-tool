@@ -3,7 +3,7 @@ package uptimerobot_tool
 import (
 	"encoding/json"
 	"fmt"
-	uptimerobot "github.com/bitfield/uptimerobot/pkg"
+	uptimerobot "github.com/1k-off/uptimerobot/pkg"
 	"io/ioutil"
 	"log"
 	"net/http"

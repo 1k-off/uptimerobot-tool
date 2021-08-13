@@ -1,14 +1,13 @@
 package uptimerobot_tool
 
 import (
-	uptimerobot "github.com/bitfield/uptimerobot/pkg"
+	uptimerobot "github.com/1k-off/uptimerobot/pkg"
 	"log"
 	"net/url"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // ProcessMonitors is an entrypoint for uptimerobot tool. It receives an array of uptimerobot accounts and sitelist for processing.
@@ -34,14 +33,11 @@ func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 		if isExist, monitor := w.isMonitorExists(enabledMonitors); !(isExist) {
 			account := findFreeAccount(uptimerobotAccount)
 			account.createNewMonitor(w)
-			time.Sleep(10 * time.Second)
 		} else {
 			account := findMonitorAccount(uptimerobotAccount, monitor)
 			if !(w.isMonitorEqualToWebsite(monitor, account)) {
 				account.deleteMonitor(monitor)
-				time.Sleep(10 * time.Second)
 				account.createNewMonitor(w)
-				time.Sleep(10 * time.Second)
 			}
 		}
 	}
@@ -51,14 +47,12 @@ func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 func getUptimerobotAccountsInfo(account []Uptimerobot) {
 	for i := range account {
 		account[i].Client = uptimerobot.New(account[i].Token)
-		time.Sleep(10 * time.Second)
 	}
 }
 
 // getAllMonitors - returns all monitors from provided account.
 func (account Uptimerobot) getAllMonitors() []uptimerobot.Monitor {
 	monitors, err := account.Client.AllMonitors()
-	time.Sleep(10 * time.Second)
 	if err != nil {
 		log.Printf("Can't get monitors for account %s. %e", account.Email, err)
 	}
@@ -188,7 +182,6 @@ func (website Website) isMonitorEqualToWebsite(m uptimerobot.Monitor, account Up
 		monitorKeywordType                               int
 	)
 	monitorAlertContacts := getWebsiteAlertContactsFromAccount(account.Token, m.FriendlyName)
-	time.Sleep(10 * time.Second)
 	websiteAlertContacts := website.getAlertContactsFromSitelist(account)
 
 	for _, mac := range monitorAlertContacts {

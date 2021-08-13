@@ -1,7 +1,7 @@
 package main
 
 import (
-	ut "github.com/1k-off/uptimerobot-tool/pkg"
+	ut "github.com/1k-off/uptimerobot/pkg"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"log"
