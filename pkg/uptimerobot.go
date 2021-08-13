@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ProcessMonitors is an entrypoint for uptimerobot tool. It receives an array of uptimerobot accounts and sitelist for processing.
@@ -32,11 +33,14 @@ func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 		if isExist, monitor := w.isMonitorExists(enabledMonitors); !(isExist) {
 			account := findFreeAccount(uptimerobotAccount)
 			account.createNewMonitor(w)
+			time.Sleep(10 * time.Second)
 		} else {
 			account := findMonitorAccount(uptimerobotAccount, monitor)
 			if !(w.isMonitorEqualToWebsite(monitor, account)) {
 				account.deleteMonitor(monitor)
+				time.Sleep(10 * time.Second)
 				account.createNewMonitor(w)
+				time.Sleep(10 * time.Second)
 			}
 		}
 	}
@@ -181,6 +185,7 @@ func (website Website) isMonitorEqualToWebsite(m uptimerobot.Monitor, account Up
 		monitorKeywordType                               int
 	)
 	monitorAlertContacts := getWebsiteAlertContactsFromAccount(account.Token, m.FriendlyName)
+	time.Sleep(10 * time.Second)
 	websiteAlertContacts := website.getAlertContactsFromSitelist(account)
 
 	for _, mac := range monitorAlertContacts {

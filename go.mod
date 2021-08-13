@@ -1,4 +1,4 @@
-module "github.com/souladm/uptimerobot-tool"
+module "github.com/1k-off/uptimerobot-tool"
 
 go 1.14
 
