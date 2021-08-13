@@ -20,6 +20,7 @@ func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 
 	for _, a := range uptimerobotAccount {
 		enabledMonitors = append(enabledMonitors, a.getAllMonitors()...)
+
 	}
 
 	for _, m := range enabledMonitors {
@@ -50,12 +51,14 @@ func ProcessMonitors(uptimerobotAccount []Uptimerobot, sitelist Sitelist) {
 func getUptimerobotAccountsInfo(account []Uptimerobot) {
 	for i := range account {
 		account[i].Client = uptimerobot.New(account[i].Token)
+		time.Sleep(10 * time.Second)
 	}
 }
 
 // getAllMonitors - returns all monitors from provided account.
 func (account Uptimerobot) getAllMonitors() []uptimerobot.Monitor {
 	monitors, err := account.Client.AllMonitors()
+	time.Sleep(10 * time.Second)
 	if err != nil {
 		log.Printf("Can't get monitors for account %s. %e", account.Email, err)
 	}
